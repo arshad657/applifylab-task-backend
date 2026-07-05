@@ -1,0 +1,156 @@
+// ============================================================================
+// Prisma schema — MongoDB connector
+//
+// Design notes (read before changing anything):
+//
+// 1. NO Prisma-level relations (`@relation`) are used between User/Post/
+//    Comment/Like. MongoDB has no real foreign keys, and Prisma relations on
+//    Mongo translate into `$lookup`-style application joins that do not scale
+//    to millions of documents. Instead we:
+//      - store plain ObjectId-string reference fields (authorId, postId, ...)
+//      - denormalize the small, frequently-read author fields (username,
+//        avatar) directly onto Post/Comment so a feed page never has to
+//        join out to `users` at read time.
+//      - maintain likesCount / commentsCount / repliesCount as denormalized
+//        counters updated with atomic `$inc` operations instead of COUNT()
+//        queries.
+//
+// 2. Every model that is queried in a "feed" pattern (Post, Comment, Like)
+//    has a compound index whose leading fields match the exact WHERE clause
+//    used by the repository, and whose trailing field is the sort key used
+//    for cursor pagination. This lets MongoDB satisfy pagination with a
+//    pure index scan — no in-memory sort, no `skip()`.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// User
+// ----------------------------------------------------------------------------
+model User {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  email        String   @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  avatarUrl    String?
+  bio          String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+// ----------------------------------------------------------------------------
+// Refresh tokens — one document per issued refresh token so any single
+// device/session can be revoked without invalidating every session.
+// ----------------------------------------------------------------------------
+model RefreshToken {
+  id        String   @id @map("_id")
+  userId    String   @db.ObjectId
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+// ----------------------------------------------------------------------------
+// Post
+// ----------------------------------------------------------------------------
+model Post {
+  id              String     @id @default(auto()) @map("_id") @db.ObjectId
+  authorId        String     @db.ObjectId
+  authorUsername  String
+  authorAvatarUrl String?
+  text            String
+  imageUrl        String?
+  visibility      Visibility @default(PUBLIC)
+
+  likesCount    Int @default(0)
+  commentsCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Public feed, newest first: WHERE visibility = PUBLIC ORDER BY createdAt DESC, _id DESC
+  @@index([visibility, createdAt])
+  // Author's own feed / profile page: WHERE authorId = ? ORDER BY createdAt DESC
+  @@index([authorId, createdAt])
+  @@map("posts")
+}
+
+enum LikeTargetType {
+  POST
+  COMMENT
+}
+
+// ----------------------------------------------------------------------------
+// Comment (top-level comments AND nested replies live in the same collection)
+//   - parentId == null            -> top-level comment on a post
+//   - parentId == <comment id>    -> reply to that comment (single level of
+//                                    nesting is enforced at the service layer;
+//                                    the schema itself supports arbitrary
+//                                    depth via `depth`)
+// ----------------------------------------------------------------------------
+model Comment {
+  id              String  @id @default(auto()) @map("_id") @db.ObjectId
+  postId          String  @db.ObjectId
+  authorId        String  @db.ObjectId
+  authorUsername  String
+  authorAvatarUrl String?
+  parentId        String? @db.ObjectId
+  depth           Int     @default(0)
+
+  text String
+
+  likesCount   Int @default(0)
+  repliesCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Top-level comments for a post, oldest-first pagination:
+  // WHERE postId = ? AND parentId = null ORDER BY createdAt ASC/DESC
+  @@index([postId, parentId, createdAt])
+  // Replies to a specific comment:
+  // WHERE parentId = ? ORDER BY createdAt ASC
+  @@index([parentId, createdAt])
+  @@map("comments")
+}
+
+// ----------------------------------------------------------------------------
+// Like — polymorphic like on either a Post or a Comment (replies are just
+// Comments with parentId set, so this single model covers likes on posts,
+// comments, and replies).
+// ----------------------------------------------------------------------------
+model Like {
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String         @db.ObjectId
+  targetType LikeTargetType
+  targetId   String         @db.ObjectId
+  createdAt  DateTime       @default(now())
+
+  // Enforces idempotent like/unlike and doubles as the lookup index for
+  // "has this user liked this target".
+  @@unique([userId, targetType, targetId])
+  // "who liked this post/comment", newest first
+  @@index([targetType, targetId, createdAt])
+  @@map("likes")
+}

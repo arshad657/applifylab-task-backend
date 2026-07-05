@@ -1,0 +1,62 @@
+import express, { Express } from "express";
+import helmet from "helmet";
+import cors from "cors";
+import compression from "compression";
+import pinoHttp from "pino-http";
+import { env } from "./config/env";
+import { logger } from "./lib/logger";
+import { globalRateLimiter } from "./middleware/rateLimiter.middleware";
+import { errorMiddleware, notFoundMiddleware } from "./middleware/error.middleware";
+import { ApiResponse } from "./utils/apiResponse";
+
+import authRoutes from "./modules/auth/auth.routes";
+import usersRoutes from "./modules/users/users.routes";
+import postsRoutes from "./modules/posts/posts.routes";
+import { postCommentsRouter, commentRouter } from "./modules/comments/comments.routes";
+import likesRoutes from "./modules/likes/likes.routes";
+import feedRoutes from "./modules/feed/feed.routes";
+import storageRoutes from "./modules/storage/storage.routes";
+
+export function createApp(): Express {
+  const app = express();
+
+  // Security headers.
+  app.use(helmet());
+  // CORS: single configured origin in production; wide open only if explicitly set to "*".
+  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  // gzip/brotli compression for feed/JSON payloads at scale.
+  app.use(compression());
+  // Structured request logging (method, path, status, latency, request id).
+  app.use(pinoHttp({ logger }));
+
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+  // Global rate limiting applied to every route; individual routers layer
+  // stricter limits (auth, writes) on top of this baseline.
+  app.use(globalRateLimiter);
+
+  app.get("/health", (_req, res) => {
+    ApiResponse.success(res, {
+      message: "Health check passed.",
+      data: { status: "ok" },
+    });
+  });
+
+  const prefix = env.API_PREFIX;
+  app.use(`${prefix}/auth`, authRoutes);
+  app.use(`${prefix}/users`, usersRoutes);
+  app.use(`${prefix}/posts`, postsRoutes);
+  // Nested comment routes: POST/GET /posts/:postId/comments
+  app.use(`${prefix}/posts/:postId/comments`, postCommentsRouter);
+  // Reply + delete routes: GET /comments/:commentId/replies, DELETE /comments/:commentId
+  app.use(`${prefix}/comments`, commentRouter);
+  app.use(`${prefix}/likes`, likesRoutes);
+  app.use(`${prefix}/feed`, feedRoutes);
+  app.use(`${prefix}/storage`, storageRoutes);
+
+  app.use(notFoundMiddleware);
+  app.use(errorMiddleware);
+
+  return app;
+}
