@@ -31,8 +31,28 @@ export class AuthController {
   }
 
   async logout(req: Request, res: Response): Promise<void> {
-    const { refreshToken } = req.body as RefreshInput;
-    await authService.logout(refreshToken);
+    const getCookieValue = (cookieHeader: string | undefined, name: string): string | null => {
+      if (!cookieHeader) return null;
+      const pairs = cookieHeader.split(";");
+      for (const pair of pairs) {
+        const [key, value] = pair.split("=");
+        if (key.trim() === name) {
+          return decodeURIComponent(value?.trim() || "");
+        }
+      }
+      return null;
+    };
+
+    const refreshToken =
+      (req as any).cookies?.refreshToken ||
+      getCookieValue(req.headers.cookie, "refreshToken") ||
+      (req.body as any)?.refreshToken;
+
+    if (refreshToken) {
+      await authService.logout(refreshToken);
+    }
+
+    res.setHeader("Set-Cookie", "refreshToken=; HttpOnly; Secure; SameSite=Lax; Path=/auth; Max-Age=0");
     res.status(204).send();
   }
 }

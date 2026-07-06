@@ -28,7 +28,13 @@ export const refreshSchema = z.object({
   params: z.object({}).optional(),
 });
 
-export const logoutSchema = refreshSchema;
+export const logoutSchema = z.object({
+  body: z.object({
+    refreshToken: z.string().min(1).optional(),
+  }).optional(),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+});
 
 export type RegisterInput = z.infer<typeof registerSchema>["body"];
 export type LoginInput = z.infer<typeof loginSchema>["body"];
