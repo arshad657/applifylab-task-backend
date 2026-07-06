@@ -11,7 +11,6 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "seed": "ts-node scripts/../prisma/seed.ts",
-    "benchmark": "ts-node scripts/benchmark.ts",
     "lint": "eslint src --ext .ts"
   },
   "prisma": {
@@ -46,7 +45,6 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^20.16.5",
     "@types/uuid": "^10.0.0",
-    "autocannon": "^7.15.0",
     "pino-pretty": "^11.2.2",
     "prisma": "^5.19.1",
     "ts-node": "^10.9.2",

@@ -1,14 +1,11 @@
-import { Visibility } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { Cursor, cursorWhereBefore } from "../../utils/pagination";
 
 export interface CreatePostData {
   authorId: string;
-  authorUsername: string;
-  authorAvatarUrl: string | null;
   text: string;
   imageUrl?: string;
-  visibility: Visibility;
+  isPublic?: boolean;
 }
 
 export class PostsRepository {
@@ -30,14 +27,23 @@ export class PostsRepository {
 
   /**
    * Public feed page — the hottest read path in the system.
-   * Uses the (visibility, createdAt) index; sort is DESC, DESC to match
+   * Uses the (isPublic, createdAt) index; sort is DESC, DESC to match
    * the cursor logic.
    */
-  async findPublicFeedPage(limit: number, cursor: Cursor | null) {
+  async findPublicFeedPage(limit: number, cursor: Cursor | null, userId?: string) {
     const posts = await prisma.post.findMany({
       where: {
-        visibility: Visibility.PUBLIC,
-        ...(cursor ? cursorWhereBefore(cursor) : {}),
+        AND: [
+          userId
+            ? {
+                OR: [
+                  { isPublic: true },
+                  { authorId: userId },
+                ],
+              }
+            : { isPublic: true },
+          ...(cursor ? [cursorWhereBefore(cursor)] : []),
+        ],
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,

@@ -22,20 +22,6 @@ export class UsersRepository {
 
   async updateProfile(id: string, data: UpdateProfileInput) {
     const user = await prisma.user.update({ where: { id }, data });
-
-    if (data.avatarUrl !== undefined) {
-      await Promise.all([
-        prisma.post.updateMany({
-          where: { authorId: id },
-          data: { authorAvatarUrl: data.avatarUrl },
-        }),
-        prisma.comment.updateMany({
-          where: { authorId: id },
-          data: { authorAvatarUrl: data.avatarUrl },
-        }),
-      ]);
-    }
-
     return user;
   }
 }

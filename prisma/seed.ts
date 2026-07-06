@@ -13,7 +13,7 @@
  * connection round-trip per row.
  */
 import { faker } from "@faker-js/faker";
-import { PrismaClient, Visibility, LikeTargetType } from "@prisma/client";
+import { PrismaClient, LikeTargetType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -81,13 +81,9 @@ async function seedPosts(
       const createdAt = faker.date.recent({ days: 180 });
       return {
         authorId: author.id,
-        authorUsername: `${author.firstName} ${author.lastName}`,
-        authorAvatarUrl: author.avatarUrl,
         text: faker.lorem.sentences({ min: 1, max: 3 }),
         imageUrl: hasImage ? faker.image.urlPicsumPhotos() : undefined,
-        visibility: faker.datatype.boolean({ probability: 0.9 })
-          ? Visibility.PUBLIC
-          : Visibility.PRIVATE,
+        isPublic: faker.datatype.boolean({ probability: 0.9 }),
         createdAt,
         updatedAt: createdAt,
       };
@@ -122,8 +118,6 @@ async function seedComments(
     const topLevelData: {
       postId: string;
       authorId: string;
-      authorUsername: string;
-      authorAvatarUrl: string | null;
       parentId: null;
       depth: number;
       text: string;
@@ -136,8 +130,6 @@ async function seedComments(
         topLevelData.push({
           postId,
           authorId: author.id,
-          authorUsername: `${author.firstName} ${author.lastName}`,
-          authorAvatarUrl: author.avatarUrl,
           parentId: null,
           depth: 0,
           text: faker.lorem.sentence(),
@@ -180,8 +172,6 @@ async function seedComments(
           return {
             postId: parent.postId,
             authorId: author.id,
-            authorUsername: `${author.firstName} ${author.lastName}`,
-            authorAvatarUrl: author.avatarUrl,
             parentId: parent.id,
             depth: 1,
             text: faker.lorem.sentence(),

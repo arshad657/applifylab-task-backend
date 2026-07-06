@@ -3,8 +3,6 @@ import { prisma } from "../../lib/prisma";
 export interface CreateCommentData {
   postId: string;
   authorId: string;
-  authorUsername: string;
-  authorAvatarUrl: string | null;
   parentId: string | null;
   depth: number;
   text: string;

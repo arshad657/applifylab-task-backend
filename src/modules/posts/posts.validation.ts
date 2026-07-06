@@ -1,16 +1,10 @@
 import { z } from "zod";
-import { Visibility } from "@prisma/client";
-
-// Tied directly to Prisma's generated Visibility enum (single source of
-// truth) rather than a hand-duplicated string union, so validated input and
-// the database enum type can never drift apart.
-const visibilitySchema = z.nativeEnum(Visibility);
 
 export const createPostSchema = z.object({
   body: z.object({
     text: z.string().max(2000).optional().default(""),
     imageUrl: z.string().url().optional(),
-    visibility: visibilitySchema.default(Visibility.PUBLIC),
+    isPublic: z.boolean().optional().default(true),
   }),
   params: z.object({}).optional(),
   query: z.object({}).optional(),

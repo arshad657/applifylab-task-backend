@@ -66,22 +66,15 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-enum Visibility {
-  PUBLIC
-  PRIVATE
-}
-
 // ----------------------------------------------------------------------------
 // Post
 // ----------------------------------------------------------------------------
 model Post {
-  id              String     @id @default(auto()) @map("_id") @db.ObjectId
-  authorId        String     @db.ObjectId
-  authorUsername  String
-  authorAvatarUrl String?
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  authorId        String   @db.ObjectId
   text            String
   imageUrl        String?
-  visibility      Visibility @default(PUBLIC)
+  isPublic        Boolean  @default(true)
 
   likesCount    Int @default(0)
   commentsCount Int @default(0)
@@ -89,8 +82,8 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Public feed, newest first: WHERE visibility = PUBLIC ORDER BY createdAt DESC, _id DESC
-  @@index([visibility, createdAt])
+  // Public feed, newest first: WHERE isPublic = true ORDER BY createdAt DESC, _id DESC
+  @@index([isPublic, createdAt])
   // Author's own feed / profile page: WHERE authorId = ? ORDER BY createdAt DESC
   @@index([authorId, createdAt])
   @@map("posts")
@@ -113,8 +106,6 @@ model Comment {
   id              String  @id @default(auto()) @map("_id") @db.ObjectId
   postId          String  @db.ObjectId
   authorId        String  @db.ObjectId
-  authorUsername  String
-  authorAvatarUrl String?
   parentId        String? @db.ObjectId
   depth           Int     @default(0)
 

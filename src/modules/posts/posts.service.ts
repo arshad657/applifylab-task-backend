@@ -1,4 +1,3 @@
-import { Visibility } from "@prisma/client";
 import { ApiError } from "../../utils/apiError";
 import { buildPaginatedResult, decodeCursor, PaginatedResult, resolvePageSize } from "../../utils/pagination";
 import { postsRepository } from "./posts.repository";
@@ -14,11 +13,9 @@ import { prisma } from "../../lib/prisma";
 export interface PostDTO {
   id: string;
   authorId: string;
-  authorUsername: string;
-  authorAvatarUrl: string | null;
   text: string;
   imageUrl: string | null;
-  visibility: Visibility;
+  isPublic?: boolean;
   likesCount: number;
   commentsCount: number;
   createdAt: Date;
@@ -44,15 +41,13 @@ export class PostsService {
 
     const post = await postsRepository.add({
       authorId: userId,
-      authorUsername: `${author.firstName} ${author.lastName}`,
-      authorAvatarUrl: author.avatarUrl,
       text: input.text,
       imageUrl: input.imageUrl,
-      visibility: input.visibility,
+      isPublic: input.isPublic,
     });
 
     // A new public post changes what page 1 of the feed looks like.
-    if (post.visibility === Visibility.PUBLIC) {
+    if (post.isPublic) {
       await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
     }
 
@@ -87,7 +82,7 @@ export class PostsService {
 
     let result: PaginatedResult<PostDTO>;
 
-    if (isFirstPage) {
+    if (isFirstPage && !userId) {
       const cacheKey = CacheKeys.publicFeedFirstPage(limit);
       const cached = await cacheService.get<PaginatedResult<PostDTO>>(cacheKey);
       if (cached) {
@@ -99,7 +94,7 @@ export class PostsService {
       }
     } else {
       const cursor = rawCursor ? decodeCursor(rawCursor) : null;
-      const rows = await postsRepository.findPublicFeedPage(limit, cursor);
+      const rows = await postsRepository.findPublicFeedPage(limit, cursor, userId);
       result = buildPaginatedResult(rows, limit);
     }
 

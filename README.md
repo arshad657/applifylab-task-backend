@@ -4,6 +4,19 @@ A production-grade social feed API: Node.js, Express, TypeScript (strict), Mongo
 
 ---
 
+## Key Features Built
+1. **Secure JWT-Based Authentication:** Standard bearer tokens and hashed refresh token rotation.
+2. **Detailed Registration:** Registers users with first name, last name, email, and password.
+3. **Protected Feed Route:** A cursor-paginated timeline feed restricted to logged-in users.
+4. **Interactive Posting:** Support for creating posts with text and optional image uploads (via Cloudinary CDN).
+5. **Private Posts:** Ability to create private (`isPublic: false`) posts visible only to their author.
+6. **Chronological Sorting:** Newest posts are rendered at the top of the feed using cursor pagination.
+7. **Polymorphic Like System:** Correctly toggles and displays the like/unlike state of posts.
+8. **Comments & Nested Replies:** Structured comment threads with their own like/unlike handlers and dynamic comments count integrity validation.
+9. **Liker Directory:** View list of profiles (name, avatar) of users who liked any post, comment, or reply.
+
+---
+
 ## 1. Architecture
 
 ```
@@ -14,7 +27,7 @@ A production-grade social feed API: Node.js, Express, TypeScript (strict), Mongo
                                    ┌──────────────▼─────────────┐
                                    │   Express app (app.ts)     │
                                    │  helmet · cors · compress  │
-                                   │  pino-http · rate-limit    │
+                                   │         rate-limit         │
                                    └──────────────┬─────────────┘
                      ┌───────────────┬────────────┼────────────┬───────────────┐
                      ▼               ▼            ▼            ▼               ▼
@@ -47,9 +60,9 @@ A production-grade social feed API: Node.js, Express, TypeScript (strict), Mongo
 MongoDB has no real foreign keys or joins. Modeling `Post.author` as a Prisma relation would compile to a `$lookup`-driven fetch per row — fine at 100 posts, a serious bottleneck at 100M. Instead:
 - Reference fields are plain strings (`authorId`, `postId`, `parentId`, `targetId`).
 - The few author fields a feed row actually renders (`username`, `avatarUrl`) are **denormalized onto Post/Comment at write time**. Reading a feed page never touches the `users` collection.
-- Counters (`likesCount`, `commentsCount`, `repliesCount`) are denormalized integers updated with atomic `$inc`, so no `COUNT()`/aggregation is ever needed to render a card.
+- Counters (`likesCount`, `repliesCount`) are denormalized integers updated with atomic `$inc`, while `commentsCount` is updated by recounting all comments/replies of the post to ensure absolute count integrity.
 
-This is a deliberate CQRS-flavored trade: writes do slightly more work (an extra `$inc`, copying two string fields) so that reads — which outnumber writes by orders of magnitude in a social feed — stay a single-collection point query.
+This is a deliberate CQRS-flavored trade: writes do slightly more work (an extra query and update, copying two string fields) so that reads — which outnumber writes by orders of magnitude in a social feed — stay a single-collection point query.
 
 ---
 
@@ -60,9 +73,6 @@ social-feed-backend/
 ├── prisma/
 │   ├── schema.prisma         # MongoDB models + indexes (see §4)
 │   └── seed.ts               # 120k posts / 2k users / comments / likes
-├── scripts/
-│   ├── benchmark.ts          # autocannon load test (feed + post detail)
-│   └── autocannon.d.ts       # minimal ambient types (no official @types)
 ├── src/
 │   ├── config/env.ts         # Zod-validated environment config (fail-fast boot)
 │   ├── lib/                  # prisma client, redis client, logger — singletons
@@ -117,20 +127,13 @@ npm run seed
 ```
 Seeds 2,000 users, 120,000 posts (90% public / 10% private), comments + one level of replies on 20,000 posts, and ~300,000 likes across posts and comments — batched with `createMany` (never one insert per row).
 
-### Benchmark
-```bash
-npm run dev            # in one terminal
-npm run benchmark      # in another, after `npm run seed`
-```
-Runs `autocannon` against the public feed (page 1, cached), a deep feed page (uncached, index scan), and post detail (cached). See §6 for how to read the numbers and why this repo can't run them for you.
-
 ---
 
 ## 4. MongoDB indexes (via Prisma `@@index`)
 
 | Collection | Index | Backs |
 |---|---|---|
-| `posts` | `(visibility, createdAt)` | Public feed page fetch: `WHERE visibility = PUBLIC ORDER BY createdAt DESC` |
+| `posts` | `(isPublic, createdAt)` | Public feed page fetch: `WHERE isPublic = true OR authorId = userId ORDER BY createdAt DESC` |
 | `posts` | `(authorId, createdAt)` | A user's own timeline / profile page |
 | `comments` | `(postId, parentId, createdAt)` | Top-level comments on a post: `WHERE postId = ? AND parentId = null ORDER BY createdAt` |
 | `comments` | `(parentId, createdAt)` | Replies to a specific comment |
@@ -197,38 +200,33 @@ Design choices:
 
 ---
 
+
 ## 9. API surface
 
 All routes are mounted under `API_PREFIX` (default `/api/v1`).
 
 ```
-POST   /auth/register
-POST   /auth/login
-POST   /auth/refresh
-POST   /auth/logout
+GET    /health                            Health check endpoint
 
-GET    /users/:username
-PATCH  /users/me                          (auth)
+POST   /auth/register                     Register a new user
+POST   /auth/login                        Authenticate and get tokens
+POST   /auth/refresh                      Rotate expired access token
+POST   /auth/logout                       Revoke user session and tokens
 
-POST   /posts                             (auth)
-GET    /posts/:postId
-PATCH  /posts/:postId                     (auth, owner only)
-DELETE /posts/:postId                     (auth, owner only)
-GET    /posts/by-user/:username           cursor-paginated
+GET    /users/:username                   Fetch public user profile details
+PATCH  /users/me                    (auth) Update user avatar/bio profile
 
-POST   /posts/:postId/comments            (auth)
-GET    /posts/:postId/comments            cursor-paginated, top-level only
-GET    /comments/:commentId/replies       cursor-paginated
-DELETE /comments/:commentId               (auth, owner only)
+GET    /posts/get-all               (auth) Retrieve posts feed (cursor-paginated)
+POST   /posts/add                   (auth) Create a new text post
+POST   /posts/upload                (auth) Upload image to Cloudinary
 
-POST   /likes/:targetType/:targetId       (auth) targetType = POST | COMMENT
-DELETE /likes/:targetType/:targetId       (auth)
+POST   /post/add-comment            (auth) Create a comment or reply on a post
+GET    /post/:postId/get-comments   (auth) Fetch comments/replies of a post
+GET    /post/:postId/get-likes            Fetch profiles who liked a post
+POST   /post/:postId/like-unlike    (auth) Toggle like/unlike state of a post
 
-GET    /feed/public                       cursor-paginated, page 1 cached
-
-POST   /storage/presign                   (auth) issue a pre-signed upload URL
-
-GET    /health
+POST   /comments/:commentId/like-unlike (auth) Toggle like/unlike of comment/reply
+GET    /comments/:commentId/get-likes     Fetch profiles who liked comment/reply
 ```
 
 Every paginated list responds with:
@@ -241,29 +239,26 @@ Every paginated list responds with:
 
 ---
 
-## 10. Benchmark results
+---
 
-**Honesty note:** this response was generated in a sandboxed environment with an egress allowlist limited to package registries (npm/pip/crates/github) — it has no route to `binaries.prisma.sh` (Prisma's engine binary host) or to a real MongoDB/Redis server, so a live load test could not actually be executed here. What *was* verified:
 
-- Full `npm install` and a clean `tsc --noEmit --strict` pass across the entire codebase (confirmed twice: once with a temporary type stub standing in for the Prisma-generated client to catch real bugs, once in the shipped state where the only remaining errors are the expected "client not generated" errors from the blocked engine download).
-- `prisma/schema.prisma` was validated for structural correctness (indexes, field types, enum usage) against the code that queries it.
+## 10. Technology Stack
 
-To get real numbers, run `npm run seed` then `npm run benchmark` against your own MongoDB + Redis; `scripts/benchmark.ts` uses `autocannon` (50 concurrent connections, 20s) against three paths: public feed page 1 (cache hit), a deep feed page (index scan), and post detail (cache hit). Representative shape to expect on modest hardware (a few vCPUs, MongoDB + Redis co-located, dataset from `npm run seed`) based on the design's complexity characteristics:
-
-| Path | Expected p50 latency | Expected p99 | Notes |
-|---|---|---|---|
-| `GET /feed/public` (page 1, Redis hit) | ~1–3 ms | ~5–10 ms | Single Redis GET, no DB round trip |
-| `GET /feed/public?cursor=...` (deep page) | ~5–15 ms | ~20–40 ms | Pure index range scan, cost independent of page depth |
-| `GET /posts/:id` (Redis hit) | ~1–3 ms | ~5–10 ms | Single Redis GET |
-| `GET /posts/:id` (cache miss) | ~5–10 ms | ~15–30 ms | Single indexed point query by `_id` |
-
-These are **directional estimates based on the query plans**, not measured numbers — treat the table as "what to expect if the design is working correctly," and replace it with your own `npm run benchmark` output before using this in any capacity-planning decision.
-
+| Technology | Purpose |
+|------------|---------|
+| Node.js | Runtime environment |
+| Express.js | REST API framework |
+| TypeScript | Type safety and maintainability |
+| MongoDB | Primary database |
+| Prisma ORM | Database access and schema management |
+| JWT | Authentication |
+| bcrypt | Password hashing |
+| Multer | File upload handling |
+| Cloudinary | Image storage |
+| Zod | Request validation |
 ---
 
 ## 11. Scaling notes for millions of posts / reads
 
 - **Read replicas**: MongoDB replica set secondaries can serve feed reads (`readPreference: secondaryPreferred`) once write load grows; not wired up by default to keep local dev simple, but `prisma.ts` is the single place to add it.
 - **Horizontal API scaling**: the app is fully stateless (JWTs, no server-side sessions, rate limiting in Redis) — safe to run N instances behind a load balancer.
-- **Sharding**: if a single replica set outgrows itself, `posts` shards cleanly on `authorId` (co-locates a user's own timeline) while the public feed's `(visibility, createdAt)` index still works per-shard with a scatter-gather merge at the query router.
-- **Counter writes under extreme like volume**: `$inc` is atomic and lock-free per document, but a single ultra-viral post can still become a write hotspot. If that becomes a real bottleneck, the next step is batching like deltas in Redis and flushing to Mongo on an interval — not implemented here to keep the like path simple and immediately consistent, which is the right default until profiling says otherwise.

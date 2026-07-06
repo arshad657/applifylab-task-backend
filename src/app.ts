@@ -17,16 +17,14 @@ export function createApp(): Express {
 
   // Security headers.
   app.use(helmet());
+
   // CORS: single configured origin in production; wide open only if explicitly set to "*".
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-  // gzip/brotli compression for feed/JSON payloads at scale.
   app.use(compression());
 
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-  // Global rate limiting applied to every route; individual routers layer
-  // stricter limits (auth, writes) on top of this baseline.
   app.use(globalRateLimiter);
 
   app.get("/health", (_req, res) => {

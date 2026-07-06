@@ -13,8 +13,6 @@ export interface CommentDTO {
   id: string;
   postId: string;
   authorId: string;
-  authorUsername: string;
-  authorAvatarUrl: string | null;
   parentId: string | null;
   depth: number;
   text: string;
@@ -22,6 +20,12 @@ export interface CommentDTO {
   createdAt: Date;
   updatedAt: Date;
   likedByUser?: boolean;
+  author?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+  } | null;
 }
 
 // Nested replies are supported 5 levels depth by default (comment -> reply),
@@ -52,8 +56,6 @@ export class CommentsService {
     const comment = await commentsRepository.add({
       postId,
       authorId: userId,
-      authorUsername: `${author.firstName} ${author.lastName}`,
-      authorAvatarUrl: author.avatarUrl,
       parentId: input.parentId ?? null,
       depth,
       text: input.text,
@@ -89,9 +91,26 @@ export class CommentsService {
       likedCommentIds = new Set(userLikes.map((l) => l.targetId));
     }
 
+    // Batch query comment author profiles
+    let authorMap = new Map<string, { id: string; firstName: string; lastName: string; avatarUrl: string | null }>();
+    if (comments.length > 0) {
+      const authorIds = Array.from(new Set(comments.map((c) => c.authorId)));
+      const authors = await prisma.user.findMany({
+        where: { id: { in: authorIds } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+        },
+      });
+      authorMap = new Map(authors.map((a) => [a.id, a]));
+    }
+
     return comments.map((c) => ({
       ...c,
       likedByUser: likedCommentIds.has(c.id),
+      author: authorMap.get(c.authorId) || null,
     }));
   }
 }
