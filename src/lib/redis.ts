@@ -1,6 +1,5 @@
 import Redis from "ioredis";
 import { env } from "../config/env";
-import { logger } from "./logger";
 
 /**
  * Single ioredis connection reused for caching, the rate-limiting store,
@@ -20,9 +19,9 @@ export const redis: Redis | null = env.REDIS_URL
   : null;
 
 if (redis) {
-  redis.on("error", (err) => logger.warn({ err }, "Redis connection error; caching and distributed rate limiting disabled"));
-  redis.on("connect", () => logger.info("Redis connected"));
+  redis.on("error", (err) => console.warn("Redis connection error; caching and distributed rate limiting disabled", err));
+  redis.on("connect", () => console.log("Redis connected"));
   redis.connect().catch((err) => {
-    logger.warn({ err }, "Failed to connect to Redis on startup; app will run without caching");
+    console.warn("Failed to connect to Redis on startup; app will run without caching", err);
   });
 }

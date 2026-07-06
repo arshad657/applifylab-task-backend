@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env";
-import { logger } from "./logger";
 
 /**
  * Single PrismaClient instance shared across the app (per Prisma's own
@@ -29,11 +28,11 @@ class PrismaService {
         $on: (event: "error" | "query" | "warn", cb: (e: any) => void) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
       };
 
-      emitter.$on("error", (e: unknown) => logger.error({ err: e }, "Prisma error"));
+      emitter.$on("error", (e: unknown) => console.error("Prisma error:", e));
 
       if (env.NODE_ENV === "development") {
         emitter.$on("query", (e: { query: string; duration: number }) =>
-          logger.debug({ query: e.query, durationMs: e.duration }, "prisma query")
+          console.debug("Prisma query:", e.query, `duration=${e.duration}ms`)
         );
       }
     }
