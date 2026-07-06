@@ -4,21 +4,55 @@ import { likesService } from "./likes.service";
 import { ApiResponse } from "../../utils/apiResponse";
 
 export class LikesController {
-  async like(req: Request, res: Response): Promise<void> {
-    const { targetType, targetId } = req.params as { targetType: LikeTargetType; targetId: string };
-    const result = await likesService.like(req.user!.id, targetType, targetId);
+  async likeUnlikePost(req: Request, res: Response): Promise<void> {
+    const { postId } = req.params;
+    const { like } = req.body as { like: boolean };
+
+    let result;
+    if (like) {
+      result = await likesService.like(req.user!.id, LikeTargetType.POST, postId);
+    } else {
+      result = await likesService.unlike(req.user!.id, LikeTargetType.POST, postId);
+    }
+
     ApiResponse.success(res, {
-      message: "Liked successfully.",
+      message: like ? "Liked successfully." : "Unliked successfully.",
       data: result,
     });
   }
 
-  async unlike(req: Request, res: Response): Promise<void> {
-    const { targetType, targetId } = req.params as { targetType: LikeTargetType; targetId: string };
-    const result = await likesService.unlike(req.user!.id, targetType, targetId);
+  async getPostLikers(req: Request, res: Response): Promise<void> {
+    const { postId } = req.params;
+    const users = await likesService.getLikers(LikeTargetType.POST, postId);
     ApiResponse.success(res, {
-      message: "Unliked successfully.",
+      message: "Likers retrieved successfully.",
+      data: users,
+    });
+  }
+
+  async likeUnlikeComment(req: Request, res: Response): Promise<void> {
+    const { commentId } = req.params;
+    const { like } = req.body as { like: boolean };
+
+    let result;
+    if (like) {
+      result = await likesService.like(req.user!.id, LikeTargetType.COMMENT, commentId);
+    } else {
+      result = await likesService.unlike(req.user!.id, LikeTargetType.COMMENT, commentId);
+    }
+
+    ApiResponse.success(res, {
+      message: like ? "Liked successfully." : "Unliked successfully.",
       data: result,
+    });
+  }
+
+  async getCommentLikers(req: Request, res: Response): Promise<void> {
+    const { commentId } = req.params;
+    const users = await likesService.getLikers(LikeTargetType.COMMENT, commentId);
+    ApiResponse.success(res, {
+      message: "Likers retrieved successfully.",
+      data: users,
     });
   }
 }

@@ -28,7 +28,7 @@ export interface CommentDTO {
 const MAX_REPLY_DEPTH = 5;
 
 export class CommentsService {
-  async createComment(postId: string, userId: string, input: CreateCommentInput): Promise<CommentDTO> {
+  async addComment(postId: string, userId: string, input: CreateCommentInput): Promise<CommentDTO> {
     const post = await postsRepository.findById(postId);
     if (!post) throw ApiError.notFound("Post not found");
 
@@ -49,7 +49,7 @@ export class CommentsService {
       depth = parent.depth + 1;
     }
 
-    const comment = await commentsRepository.create({
+    const comment = await commentsRepository.add({
       postId,
       authorId: userId,
       authorUsername: `${author.firstName} ${author.lastName}`,

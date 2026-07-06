@@ -10,12 +10,12 @@ export class UsersRepository {
     // username is in format "firstName_lastName", parse it to find the user
     const parts = username.split('_');
     if (parts.length < 2) return null;
-    const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-    const lastName = parts.slice(1).join('_').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('_');
+    const firstName = decodeURIComponent(parts[0]);
+    const lastName = decodeURIComponent(parts.slice(1).join('_'));
     return prisma.user.findFirst({
       where: {
-        firstName,
-        lastName,
+        firstName: { equals: firstName, mode: 'insensitive' },
+        lastName: { equals: lastName, mode: 'insensitive' },
       },
     });
   }

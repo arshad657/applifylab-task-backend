@@ -16,31 +16,27 @@ export const createPostSchema = z.object({
   query: z.object({}).optional(),
 });
 
-
-export const updatePostSchema = z.object({
-  body: z.object({
-    text: z.string().max(2000).optional(),
-    imageUrl: z.string().url().optional(),
-    visibility: visibilitySchema.optional(),
-  }),
-  params: z.object({ postId: z.string().min(1) }),
-  query: z.object({}).optional(),
-});
-
 export const postIdParamSchema = z.object({
   params: z.object({ postId: z.string().min(1) }),
   body: z.object({}).optional(),
   query: z.object({}).optional(),
 });
 
-export const listUserPostsSchema = z.object({
-  params: z.object({ username: z.string().min(1) }),
+export const likeUnlikePostSchema = z.object({
+  params: z.object({ postId: z.string().min(1) }),
+  body: z.object({
+    like: z.boolean(),
+  }),
+  query: z.object({}).optional(),
+});
+
+export const getAllPostsSchema = z.object({
   query: z.object({
     cursor: z.string().optional(),
     limit: z.coerce.number().int().positive().optional(),
   }),
   body: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
 export type CreatePostInput = z.infer<typeof createPostSchema>["body"];
-export type UpdatePostInput = z.infer<typeof updatePostSchema>["body"];

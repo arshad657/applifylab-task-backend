@@ -12,7 +12,7 @@ export interface CreatePostData {
 }
 
 export class PostsRepository {
-  create(data: CreatePostData) {
+  add(data: CreatePostData) {
     return prisma.post.create({ data });
   }
 
@@ -74,22 +74,6 @@ export class PostsRepository {
       ...post,
       author: authorMap.get(post.authorId) || null,
     }));
-  }
-
-  /**
-   * A single user's posts, respecting visibility: the owner sees everything,
-   * anyone else only sees PUBLIC posts. Uses the (authorId, createdAt) index.
-   */
-  findUserPostsPage(authorId: string, includePrivate: boolean, limit: number, cursor: Cursor | null) {
-    return prisma.post.findMany({
-      where: {
-        authorId,
-        ...(includePrivate ? {} : { visibility: Visibility.PUBLIC }),
-        ...(cursor ? cursorWhereBefore(cursor) : {}),
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-    });
   }
 }
 

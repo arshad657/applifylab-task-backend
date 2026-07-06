@@ -12,7 +12,7 @@ export interface CreateCommentData {
 }
 
 export class CommentsRepository {
-  create(data: CreateCommentData) {
+  add(data: CreateCommentData) {
     return prisma.comment.create({ data });
   }
 

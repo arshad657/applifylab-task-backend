@@ -1,8 +1,16 @@
 import { Router } from "express";
 import { postsController } from "./posts.controller";
-import { createPostSchema, listUserPostsSchema, postIdParamSchema, updatePostSchema } from "./posts.validation";
+import { commentsController } from "../comments/comments.controller";
+import { likesController } from "../likes/likes.controller";
+import {
+  createPostSchema,
+  postIdParamSchema,
+  getAllPostsSchema,
+  likeUnlikePostSchema,
+} from "./posts.validation";
+import { createCommentSchema, listCommentsSchema } from "../comments/comments.validation";
 import { validate } from "../../middleware/validate.middleware";
-import { optionalAuth, requireAuth } from "../../middleware/auth.middleware";
+import { requireAuth } from "../../middleware/auth.middleware";
 import { writeRateLimiter } from "../../middleware/rateLimiter.middleware";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { multerFileFilter } from "../../utils/multerFilter";
@@ -33,8 +41,11 @@ const upload = multer({
   fileFilter: multerFileFilter,
 });
 
+// Router for /posts
 const router = Router();
 
+router.get("/get-all", requireAuth, validate(getAllPostsSchema), asyncHandler(postsController.getAllPosts.bind(postsController)));
+router.post("/add", requireAuth, writeRateLimiter, validate(createPostSchema), asyncHandler(postsController.add.bind(postsController)));
 router.post(
   "/upload",
   requireAuth,
@@ -42,15 +53,37 @@ router.post(
   asyncHandler(postsController.uploadImage.bind(postsController))
 );
 
-router.post("/create", requireAuth, writeRateLimiter, validate(createPostSchema), asyncHandler(postsController.create.bind(postsController)));
-router.get("/:postId", optionalAuth, validate(postIdParamSchema), asyncHandler(postsController.getById.bind(postsController)));
-router.patch("/:postId", requireAuth, validate(updatePostSchema), asyncHandler(postsController.update.bind(postsController)));
-router.delete("/:postId", requireAuth, validate(postIdParamSchema), asyncHandler(postsController.remove.bind(postsController)));
-router.get(
-  "/by-user/:username",
-  optionalAuth,
-  validate(listUserPostsSchema),
-  asyncHandler(postsController.listByUser.bind(postsController))
+
+// Router for /post
+const postRouter = Router();
+
+postRouter.post(
+  "/add-comment",
+  requireAuth,
+  writeRateLimiter,
+  validate(createCommentSchema),
+  asyncHandler(commentsController.add.bind(commentsController))
 );
 
+postRouter.get(
+  "/:postId/get-comments",
+  validate(listCommentsSchema),
+  asyncHandler(commentsController.listTopLevel.bind(commentsController))
+);
+
+postRouter.get(
+  "/:postId/get-likes",
+  validate(postIdParamSchema),
+  asyncHandler(likesController.getPostLikers.bind(likesController))
+);
+
+postRouter.post(
+  "/:postId/like-unlike",
+  requireAuth,
+  writeRateLimiter,
+  validate(likeUnlikePostSchema),
+  asyncHandler(likesController.likeUnlikePost.bind(likesController))
+);
+
+export { postRouter };
 export default router;
