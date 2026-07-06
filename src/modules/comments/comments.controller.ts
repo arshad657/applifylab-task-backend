@@ -5,7 +5,8 @@ import { ApiResponse } from "../../utils/apiResponse";
 
 export class CommentsController {
   async create(req: Request, res: Response): Promise<void> {
-    const comment = await commentsService.createComment(req.params.postId, req.user!.id, req.body as CreateCommentInput);
+    const input = req.body as CreateCommentInput;
+    const comment = await commentsService.createComment(input.postId, req.user!.id, input);
     ApiResponse.success(res, {
       code: 201,
       message: "Comment created successfully.",
@@ -19,14 +20,10 @@ export class CommentsController {
   }
 
   async listTopLevel(req: Request, res: Response): Promise<void> {
-    const { cursor, limit } = req.query as { cursor?: string; limit?: number };
-    const result = await commentsService.listTopLevel(req.params.postId, cursor, limit);
+    const comments = await commentsService.getCommentsByPostId(req.params.postId);
     ApiResponse.success(res, {
       message: "Comments retrieved successfully.",
-      data: result.items,
-      meta: {
-        pagination: { nextCursor: result.nextCursor, hasMore: result.hasMore },
-      },
+      data: comments,
     });
   }
 

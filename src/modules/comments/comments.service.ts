@@ -25,7 +25,7 @@ export interface CommentDTO {
 // Nested replies are supported one level deep by default (comment -> reply),
 // which matches almost every mainstream feed UI. The schema itself allows
 // deeper nesting (via `depth`) if product requirements change later.
-const MAX_REPLY_DEPTH = 1;
+const MAX_REPLY_DEPTH = 5;
 
 export class CommentsService {
   async createComment(postId: string, userId: string, input: CreateCommentInput): Promise<CommentDTO> {
@@ -99,6 +99,12 @@ export class CommentsService {
     const cursor = rawCursor ? decodeCursor(rawCursor) : null;
     const rows = await commentsRepository.findRepliesPage(commentId, limit, cursor);
     return buildPaginatedResult(rows, limit);
+  }
+
+  async getCommentsByPostId(postId: string): Promise<CommentDTO[]> {
+    const post = await postsRepository.findById(postId);
+    if (!post) throw ApiError.notFound("Post not found");
+    return commentsRepository.findByPostId(postId);
   }
 }
 
