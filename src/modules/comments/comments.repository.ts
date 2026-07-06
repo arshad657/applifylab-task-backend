@@ -20,6 +20,13 @@ export class CommentsRepository {
     return prisma.comment.findUnique({ where: { id } });
   }
 
+  findByPostId(postId: string) {
+    return prisma.comment.findMany({
+      where: { postId },
+      orderBy: [{ createdAt: "asc" }],
+    });
+  }
+
   delete(id: string) {
     return prisma.comment.delete({ where: { id } });
   }

@@ -2,10 +2,11 @@ import { z } from "zod";
 
 export const createCommentSchema = z.object({
   body: z.object({
+    postId: z.string().min(1),
     text: z.string().min(1).max(1000),
-    parentId: z.string().min(1).optional(), // presence = this is a reply
+    parentId: z.string().min(1).optional(),
   }),
-  params: z.object({ postId: z.string().min(1) }),
+  params: z.object({}).optional(),
   query: z.object({}).optional(),
 });
 
