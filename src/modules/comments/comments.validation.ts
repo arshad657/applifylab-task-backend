@@ -19,15 +19,6 @@ export const listCommentsSchema = z.object({
   body: z.object({}).optional(),
 });
 
-export const listRepliesSchema = z.object({
-  params: z.object({ commentId: z.string().min(1) }),
-  query: z.object({
-    cursor: z.string().optional(),
-    limit: z.coerce.number().int().positive().optional(),
-  }),
-  body: z.object({}).optional(),
-});
-
 export const commentIdParamSchema = z.object({
   params: z.object({ commentId: z.string().min(1) }),
   body: z.object({}).optional(),

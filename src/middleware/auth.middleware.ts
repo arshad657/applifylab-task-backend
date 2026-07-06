@@ -41,22 +41,3 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   }
 }
 
-/**
- * Attaches `req.user` if a valid token is present, but never rejects the
- * request. Used on routes that behave differently for authenticated vs
- * anonymous users (e.g. public feed showing "liked by me" state).
- */
-export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
-  const token = extractBearerToken(req);
-  if (!token) {
-    next();
-    return;
-  }
-  try {
-    const payload = verifyAccessToken(token);
-    req.user = { id: payload.sub, email: payload.email };
-  } catch {
-    // Ignore invalid tokens on optional-auth routes; treat as anonymous.
-  }
-  next();
-}

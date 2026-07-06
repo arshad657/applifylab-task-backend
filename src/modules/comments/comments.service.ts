@@ -1,5 +1,5 @@
 import { ApiError } from "../../utils/apiError";
-import { buildPaginatedResult, decodeCursor, PaginatedResult, resolvePageSize } from "../../utils/pagination";
+
 import { commentsRepository } from "./comments.repository";
 import { postsRepository } from "../posts/posts.repository";
 import { usersRepository } from "../users/users.repository";
@@ -7,6 +7,7 @@ import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import type { CreateCommentInput } from "./comments.validation";
 import { env } from "../../config/env";
+import { prisma } from "../../lib/prisma";
 
 export interface CommentDTO {
   id: string;
@@ -18,9 +19,9 @@ export interface CommentDTO {
   depth: number;
   text: string;
   likesCount: number;
-  repliesCount: number;
   createdAt: Date;
   updatedAt: Date;
+  likedByUser?: boolean;
 }
 
 // Nested replies are supported 5 levels depth by default (comment -> reply),
@@ -58,9 +59,6 @@ export class CommentsService {
       text: input.text,
     });
 
-    if (parent) {
-      await commentsRepository.incrementRepliesCount(parent.id, 1);
-    }
     await postsRepository.incrementCommentsCount(postId, 1);
 
     // Comment counts are embedded in the cached post detail payload and public feed
@@ -71,40 +69,30 @@ export class CommentsService {
     return comment;
   }
 
-  async deleteComment(commentId: string, userId: string): Promise<void> {
-    const comment = await commentsRepository.findById(commentId);
-    if (!comment) throw ApiError.notFound("Comment not found");
-    if (comment.authorId !== userId) throw ApiError.forbidden("You can only delete your own comments");
-
-    await commentsRepository.delete(commentId);
-
-    if (comment.parentId) {
-      await commentsRepository.incrementRepliesCount(comment.parentId, -1);
-    }
-    await postsRepository.incrementCommentsCount(comment.postId, -1);
-
-    await cacheService.del(CacheKeys.postDetail(comment.postId));
-    await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
-  }
-
-  async listTopLevel(postId: string, rawCursor?: string, rawLimit?: number): Promise<PaginatedResult<CommentDTO>> {
-    const limit = resolvePageSize(rawLimit);
-    const cursor = rawCursor ? decodeCursor(rawCursor) : null;
-    const rows = await commentsRepository.findTopLevelPage(postId, limit, cursor);
-    return buildPaginatedResult(rows, limit);
-  }
-
-  async listReplies(commentId: string, rawCursor?: string, rawLimit?: number): Promise<PaginatedResult<CommentDTO>> {
-    const limit = resolvePageSize(rawLimit);
-    const cursor = rawCursor ? decodeCursor(rawCursor) : null;
-    const rows = await commentsRepository.findRepliesPage(commentId, limit, cursor);
-    return buildPaginatedResult(rows, limit);
-  }
-
-  async getCommentsByPostId(postId: string): Promise<CommentDTO[]> {
+  async getCommentsByPostId(postId: string, userId?: string): Promise<(CommentDTO & { likedByUser: boolean })[]> {
     const post = await postsRepository.findById(postId);
     if (!post) throw ApiError.notFound("Post not found");
-    return commentsRepository.findByPostId(postId);
+    const comments = await commentsRepository.findByPostId(postId);
+
+    let likedCommentIds = new Set<string>();
+
+    if (userId && comments.length > 0) {
+      const commentIds = comments.map((c) => c.id);
+      const userLikes = await prisma.like.findMany({
+        where: {
+          userId,
+          targetType: "COMMENT",
+          targetId: { in: commentIds },
+        },
+        select: { targetId: true },
+      });
+      likedCommentIds = new Set(userLikes.map((l) => l.targetId));
+    }
+
+    return comments.map((c) => ({
+      ...c,
+      likedByUser: likedCommentIds.has(c.id),
+    }));
   }
 }
 
