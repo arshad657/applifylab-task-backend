@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "seed": "ts-node scripts/../prisma/seed.ts",
+    "seed": "ts-node prisma/seed.ts",
     "lint": "eslint src --ext .ts"
   },
   "prisma": {
