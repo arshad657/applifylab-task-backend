@@ -14,10 +14,10 @@ class PrismaService {
         log:
           env.NODE_ENV === "development"
             ? [
-                { emit: "event", level: "query" },
-                { emit: "event", level: "error" },
-                { emit: "event", level: "warn" },
-              ]
+              { emit: "event", level: "query" },
+              { emit: "event", level: "error" },
+              { emit: "event", level: "warn" },
+            ]
             : [{ emit: "event", level: "error" }],
       });
 
@@ -30,11 +30,11 @@ class PrismaService {
 
       emitter.$on("error", (e: unknown) => console.error("Prisma error:", e));
 
-      if (env.NODE_ENV === "development") {
-        emitter.$on("query", (e: { query: string; duration: number }) =>
-          console.debug("Prisma query:", e.query, `duration=${e.duration}ms`)
-        );
-      }
+      // if (env.NODE_ENV === "development") {
+      //   emitter.$on("query", (e: { query: string; duration: number }) =>
+      //     console.debug("Prisma query:", e.query, `duration=${e.duration}ms`)
+      //   );
+      // }
     }
     return PrismaService.instance;
   }

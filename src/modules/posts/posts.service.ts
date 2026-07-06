@@ -7,6 +7,8 @@ import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import { env } from "../../config/env";
 import type { CreatePostInput, UpdatePostInput } from "./posts.validation";
+import { cloudinary } from "../../config/cloudinary";
+import fs from "fs";
 
 export interface PostDTO {
   id: string;
@@ -115,6 +117,24 @@ export class PostsService {
 
     const rows = await postsRepository.findUserPostsPage(author.id, includePrivate, limit, cursor);
     return buildPaginatedResult(rows, limit);
+  }
+
+  async uploadImage(file: Express.Multer.File): Promise<string> {
+    if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+      await fs.promises.unlink(file.path).catch(() => {});
+      throw ApiError.internal("Cloudinary is not configured on the server");
+    }
+
+    try {
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: "uploads",
+      });
+      return result.secure_url;
+    } catch (error: any) {
+      throw ApiError.internal(`Failed to upload image to Cloudinary: ${error.message}`);
+    } finally {
+      await fs.promises.unlink(file.path).catch(() => {});
+    }
   }
 }
 

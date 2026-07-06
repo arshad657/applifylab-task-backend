@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { postsService } from "./posts.service";
 import type { CreatePostInput, UpdatePostInput } from "./posts.validation";
 import { ApiResponse } from "../../utils/apiResponse";
+import { ApiError } from "../../utils/apiError";
 
 export class PostsController {
   async create(req: Request, res: Response): Promise<void> {
@@ -10,6 +11,17 @@ export class PostsController {
       code: 201,
       message: "Post created successfully.",
       data: post,
+    });
+  }
+
+  async uploadImage(req: Request, res: Response): Promise<void> {
+    if (!req.file) {
+      throw ApiError.badRequest("No file uploaded");
+    }
+    const fileUrl = await postsService.uploadImage(req.file);
+    ApiResponse.success(res, {
+      message: "File uploaded successfully",
+      data: { url: fileUrl },
     });
   }
 

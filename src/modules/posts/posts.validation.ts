@@ -8,7 +8,7 @@ const visibilitySchema = z.nativeEnum(Visibility);
 
 export const createPostSchema = z.object({
   body: z.object({
-    text: z.string().min(1).max(2000),
+    text: z.string().max(2000).optional().default(""),
     imageUrl: z.string().url().optional(),
     visibility: visibilitySchema.default(Visibility.PUBLIC),
   }),
@@ -19,7 +19,7 @@ export const createPostSchema = z.object({
 
 export const updatePostSchema = z.object({
   body: z.object({
-    text: z.string().min(1).max(2000).optional(),
+    text: z.string().max(2000).optional(),
     imageUrl: z.string().url().optional(),
     visibility: visibilitySchema.optional(),
   }),
