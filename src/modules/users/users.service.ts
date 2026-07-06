@@ -1,6 +1,7 @@
 import { ApiError } from "../../utils/apiError";
 import { usersRepository } from "./users.repository";
 import type { UpdateProfileInput } from "./users.validation";
+import { cacheService } from "../cache/cache.service";
 
 export interface PublicProfile {
   id: string;
@@ -32,6 +33,11 @@ export class UsersService {
 
   async updateProfile(userId: string, input: UpdateProfileInput): Promise<PublicProfile> {
     const user = await usersRepository.updateProfile(userId, input);
+
+    if (input.avatarUrl !== undefined) {
+      await cacheService.delPattern("feed:public:*");
+    }
+
     return toPublicProfile(user);
   }
 }
