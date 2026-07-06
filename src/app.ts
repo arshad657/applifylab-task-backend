@@ -13,7 +13,6 @@ import postsRoutes from "./modules/posts/posts.routes";
 import { postCommentsRouter } from "./modules/comments/comments.routes";
 import likesRoutes from "./modules/likes/likes.routes";
 import feedRoutes from "./modules/feed/feed.routes";
-import storageRoutes from "./modules/storage/storage.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -46,7 +45,6 @@ export function createApp(): Express {
   app.use(`${prefix}/post`, postCommentsRouter);
   app.use(`${prefix}/likes`, likesRoutes);
   app.use(`${prefix}/feed`, feedRoutes);
-  app.use(`${prefix}/storage`, storageRoutes);
 
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);
