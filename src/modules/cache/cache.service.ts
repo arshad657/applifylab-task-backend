@@ -1,5 +1,4 @@
 import { redis } from "../../lib/redis";
-import { logger } from "../../lib/logger";
 
 /**
  * Thin cache-aside wrapper around Redis. All cache reads fail open (a Redis
@@ -16,7 +15,7 @@ export class CacheService {
       if (!raw) return null;
       return JSON.parse(raw) as T;
     } catch (err) {
-      logger.warn({ err, key }, "Cache GET failed; falling back to source of truth");
+      console.warn("Cache GET failed; falling back to source of truth", { err, key });
       return null;
     }
   }
@@ -26,7 +25,7 @@ export class CacheService {
     try {
       await redis.set(key, JSON.stringify(value), "EX", ttlSeconds);
     } catch (err) {
-      logger.warn({ err, key }, "Cache SET failed; continuing without cache");
+      console.warn("Cache SET failed; continuing without cache", { err, key });
     }
   }
 
@@ -35,7 +34,7 @@ export class CacheService {
     try {
       await redis.del(key);
     } catch (err) {
-      logger.warn({ err, key }, "Cache DEL failed");
+      console.warn("Cache DEL failed", { err, key });
     }
   }
 
@@ -52,7 +51,7 @@ export class CacheService {
         }
       } while (cursor !== "0");
     } catch (err) {
-      logger.warn({ err, pattern }, "Cache pattern DEL failed");
+      console.warn("Cache pattern DEL failed", { err, pattern });
     }
   }
 }

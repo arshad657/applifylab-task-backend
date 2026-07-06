@@ -3,7 +3,6 @@ import { ApiError } from "../../utils/apiError";
 import { buildPaginatedResult, decodeCursor, PaginatedResult, resolvePageSize } from "../../utils/pagination";
 import { postsRepository } from "./posts.repository";
 import { usersRepository } from "../users/users.repository";
-import { storageService } from "../storage/storage.service";
 import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import { env } from "../../config/env";
@@ -35,7 +34,6 @@ function toDTO(post: PostDTO): PostDTO {
 
 export class PostsService {
   async createPost(userId: string, input: CreatePostInput): Promise<PostDTO> {
-    storageService.assertOwnedImageUrl(input.imageUrl);
     console.log("userId: ", userId)
     const author = await usersRepository.findById(userId);
     if (!author) throw ApiError.notFound("Author not found");
@@ -79,8 +77,6 @@ export class PostsService {
     const existing = await postsRepository.findById(postId);
     if (!existing) throw ApiError.notFound("Post not found");
     if (existing.authorId !== userId) throw ApiError.forbidden("You can only edit your own posts");
-
-    storageService.assertOwnedImageUrl(input.imageUrl);
 
     const updated = await postsRepository.update(postId, input);
 

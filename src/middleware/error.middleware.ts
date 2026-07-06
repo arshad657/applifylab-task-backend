@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/apiError";
-import { logger } from "../lib/logger";
 import { ApiResponse } from "../utils/apiResponse";
 
 /**
@@ -31,9 +30,9 @@ export function errorMiddleware(err: unknown, req: Request, res: Response, _next
   };
 
   if (apiError.statusCode >= 500) {
-    logger.error(logPayload, apiError.message);
+    console.error("Error occurred:", apiError.message, logPayload);
   } else {
-    logger.warn(logPayload, apiError.message);
+    console.warn("Warn occurred:", apiError.message, logPayload);
   }
 
   let formattedErrors: Record<string, any> | undefined = undefined;
