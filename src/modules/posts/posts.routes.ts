@@ -67,8 +67,9 @@ postRouter.post(
 
 postRouter.get(
   "/:postId/get-comments",
+  requireAuth,
   validate(listCommentsSchema),
-  asyncHandler(commentsController.listTopLevel.bind(commentsController))
+  asyncHandler(commentsController.listComments.bind(commentsController))
 );
 
 postRouter.get(

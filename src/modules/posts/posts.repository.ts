@@ -1,4 +1,4 @@
-import { Prisma, Visibility } from "@prisma/client";
+import { Visibility } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { Cursor, cursorWhereBefore } from "../../utils/pagination";
 
@@ -16,20 +16,8 @@ export class PostsRepository {
     return prisma.post.create({ data });
   }
 
-  getAll() {
-    return prisma.post.findMany({ orderBy: [{ createdAt: "desc" }] });
-  }
-
   findById(id: string) {
     return prisma.post.findUnique({ where: { id } });
-  }
-
-  update(id: string, data: Prisma.PostUpdateInput) {
-    return prisma.post.update({ where: { id }, data });
-  }
-
-  delete(id: string) {
-    return prisma.post.delete({ where: { id } });
   }
 
   incrementLikesCount(id: string, delta: 1 | -1) {
@@ -43,7 +31,7 @@ export class PostsRepository {
   /**
    * Public feed page — the hottest read path in the system.
    * Uses the (visibility, createdAt) index; sort is DESC, DESC to match
-   * the compound cursor comparison exactly.
+   * the cursor logic.
    */
   async findPublicFeedPage(limit: number, cursor: Cursor | null) {
     const posts = await prisma.post.findMany({
@@ -52,10 +40,8 @@ export class PostsRepository {
         ...(cursor ? cursorWhereBefore(cursor) : {}),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1, // over-fetch by one to know if another page exists
+      take: limit + 1,
     });
-
-    if (posts.length === 0) return [];
 
     const authorIds = Array.from(new Set(posts.map((p) => p.authorId)));
     const authors = await prisma.user.findMany({

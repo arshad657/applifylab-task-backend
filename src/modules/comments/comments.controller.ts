@@ -14,28 +14,11 @@ export class CommentsController {
     });
   }
 
-  async remove(req: Request, res: Response): Promise<void> {
-    await commentsService.deleteComment(req.params.commentId, req.user!.id);
-    res.status(204).send();
-  }
-
-  async listTopLevel(req: Request, res: Response): Promise<void> {
-    const comments = await commentsService.getCommentsByPostId(req.params.postId);
+  async listComments(req: Request, res: Response): Promise<void> {
+    const comments = await commentsService.getCommentsByPostId(req.params.postId, req.user?.id);
     ApiResponse.success(res, {
       message: "Comments retrieved successfully.",
       data: comments,
-    });
-  }
-
-  async listReplies(req: Request, res: Response): Promise<void> {
-    const { cursor, limit } = req.query as { cursor?: string; limit?: number };
-    const result = await commentsService.listReplies(req.params.commentId, cursor, limit);
-    ApiResponse.success(res, {
-      message: "Replies retrieved successfully.",
-      data: result.items,
-      meta: {
-        pagination: { nextCursor: result.nextCursor, hasMore: result.hasMore },
-      },
     });
   }
 }

@@ -193,21 +193,6 @@ async function seedComments(
     if (replyData.length > 0) {
       await prisma.comment.createMany({ data: replyData });
       totalReplies += replyData.length;
-
-      const repliesCountByParent = new Map<string, number>();
-      for (const r of replyData)
-        repliesCountByParent.set(
-          r.parentId,
-          (repliesCountByParent.get(r.parentId) ?? 0) + 1,
-        );
-      await Promise.all(
-        Array.from(repliesCountByParent.entries()).map(([parentId, count]) =>
-          prisma.comment.update({
-            where: { id: parentId },
-            data: { repliesCount: { increment: count } },
-          }),
-        ),
-      );
     }
   }
 
