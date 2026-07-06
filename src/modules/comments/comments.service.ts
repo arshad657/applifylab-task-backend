@@ -6,6 +6,7 @@ import { usersRepository } from "../users/users.repository";
 import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import type { CreateCommentInput } from "./comments.validation";
+import { env } from "../../config/env";
 
 export interface CommentDTO {
   id: string;
@@ -22,9 +23,7 @@ export interface CommentDTO {
   updatedAt: Date;
 }
 
-// Nested replies are supported one level deep by default (comment -> reply),
-// which matches almost every mainstream feed UI. The schema itself allows
-// deeper nesting (via `depth`) if product requirements change later.
+// Nested replies are supported 5 levels depth by default (comment -> reply),
 const MAX_REPLY_DEPTH = 5;
 
 export class CommentsService {
@@ -61,13 +60,13 @@ export class CommentsService {
 
     if (parent) {
       await commentsRepository.incrementRepliesCount(parent.id, 1);
-    } else {
-      await postsRepository.incrementCommentsCount(postId, 1);
     }
+    await postsRepository.incrementCommentsCount(postId, 1);
 
-    // Comment counts are embedded in the cached post detail payload, so it
-    // must be invalidated whenever commentsCount changes.
+    // Comment counts are embedded in the cached post detail payload and public feed
+    // so they must be invalidated whenever commentsCount changes.
     await cacheService.del(CacheKeys.postDetail(postId));
+    await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
 
     return comment;
   }
@@ -81,10 +80,11 @@ export class CommentsService {
 
     if (comment.parentId) {
       await commentsRepository.incrementRepliesCount(comment.parentId, -1);
-    } else {
-      await postsRepository.incrementCommentsCount(comment.postId, -1);
     }
+    await postsRepository.incrementCommentsCount(comment.postId, -1);
+
     await cacheService.del(CacheKeys.postDetail(comment.postId));
+    await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
   }
 
   async listTopLevel(postId: string, rawCursor?: string, rawLimit?: number): Promise<PaginatedResult<CommentDTO>> {
