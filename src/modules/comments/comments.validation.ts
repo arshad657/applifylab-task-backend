@@ -34,4 +34,12 @@ export const commentIdParamSchema = z.object({
   query: z.object({}).optional(),
 });
 
+export const likeUnlikeCommentSchema = z.object({
+  params: z.object({ commentId: z.string().min(1) }),
+  body: z.object({
+    like: z.boolean(),
+  }),
+  query: z.object({}).optional(),
+});
+
 export type CreateCommentInput = z.infer<typeof createCommentSchema>["body"];

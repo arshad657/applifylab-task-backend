@@ -5,6 +5,7 @@ import { postsRepository } from "../posts/posts.repository";
 import { commentsRepository } from "../comments/comments.repository";
 import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
+import { env } from "../../config/env";
 
 /**
  * Likes are idempotent by design: liking an already-liked target or
@@ -59,9 +60,15 @@ export class LikesService {
     if (targetType === LikeTargetType.POST) {
       await postsRepository.incrementLikesCount(targetId, delta);
       await cacheService.del(CacheKeys.postDetail(targetId));
+      await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
     } else {
       await commentsRepository.incrementLikesCount(targetId, delta);
     }
+  }
+
+  async getLikers(targetType: LikeTargetType, targetId: string) {
+    await this.assertTargetExists(targetType, targetId);
+    return likesRepository.findLikers(targetType, targetId);
   }
 }
 

@@ -4,9 +4,9 @@ import type { CreateCommentInput } from "./comments.validation";
 import { ApiResponse } from "../../utils/apiResponse";
 
 export class CommentsController {
-  async create(req: Request, res: Response): Promise<void> {
+  async add(req: Request, res: Response): Promise<void> {
     const input = req.body as CreateCommentInput;
-    const comment = await commentsService.createComment(input.postId, req.user!.id, input);
+    const comment = await commentsService.addComment(input.postId, req.user!.id, input);
     ApiResponse.success(res, {
       code: 201,
       message: "Comment created successfully.",

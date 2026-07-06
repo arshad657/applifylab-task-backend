@@ -6,9 +6,10 @@ import { usersRepository } from "../users/users.repository";
 import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import { env } from "../../config/env";
-import type { CreatePostInput, UpdatePostInput } from "./posts.validation";
+import type { CreatePostInput } from "./posts.validation";
 import { cloudinary } from "../../config/cloudinary";
 import fs from "fs";
+import { prisma } from "../../lib/prisma";
 
 export interface PostDTO {
   id: string;
@@ -22,6 +23,7 @@ export interface PostDTO {
   commentsCount: number;
   createdAt: Date;
   updatedAt: Date;
+  isLIkedByUser?: boolean;
   author?: {
     id: string;
     firstName: string;
@@ -35,12 +37,12 @@ function toDTO(post: PostDTO): PostDTO {
 }
 
 export class PostsService {
-  async createPost(userId: string, input: CreatePostInput): Promise<PostDTO> {
+  async addPost(userId: string, input: CreatePostInput): Promise<PostDTO> {
     console.log("userId: ", userId)
     const author = await usersRepository.findById(userId);
     if (!author) throw ApiError.notFound("Author not found");
 
-    const post = await postsRepository.create({
+    const post = await postsRepository.add({
       authorId: userId,
       authorUsername: `${author.firstName} ${author.lastName}`,
       authorAvatarUrl: author.avatarUrl,
@@ -55,68 +57,6 @@ export class PostsService {
     }
 
     return toDTO(post);
-  }
-
-  async getPostById(postId: string, requesterId?: string): Promise<PostDTO> {
-    const cacheKey = CacheKeys.postDetail(postId);
-    const cached = await cacheService.get<PostDTO>(cacheKey);
-    const post = cached ?? (await postsRepository.findById(postId));
-
-    if (!post) throw ApiError.notFound("Post not found");
-
-    if (post.visibility === Visibility.PRIVATE && post.authorId !== requesterId) {
-      throw ApiError.forbidden("This post is private");
-    }
-
-    if (!cached) {
-      await cacheService.set(cacheKey, post, env.REDIS_CACHE_TTL_POST_SECONDS);
-    }
-
-    return toDTO(post);
-  }
-
-  async updatePost(postId: string, userId: string, input: UpdatePostInput): Promise<PostDTO> {
-    const existing = await postsRepository.findById(postId);
-    if (!existing) throw ApiError.notFound("Post not found");
-    if (existing.authorId !== userId) throw ApiError.forbidden("You can only edit your own posts");
-
-    const updated = await postsRepository.update(postId, input);
-
-    await cacheService.del(CacheKeys.postDetail(postId));
-    if (existing.visibility === Visibility.PUBLIC || updated.visibility === Visibility.PUBLIC) {
-      await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
-    }
-
-    return toDTO(updated);
-  }
-
-  async deletePost(postId: string, userId: string): Promise<void> {
-    const existing = await postsRepository.findById(postId);
-    if (!existing) throw ApiError.notFound("Post not found");
-    if (existing.authorId !== userId) throw ApiError.forbidden("You can only delete your own posts");
-
-    await postsRepository.delete(postId);
-    await cacheService.del(CacheKeys.postDetail(postId));
-    if (existing.visibility === Visibility.PUBLIC) {
-      await cacheService.del(CacheKeys.publicFeedFirstPage(env.DEFAULT_PAGE_SIZE));
-    }
-  }
-
-  async listUserPosts(
-    username: string,
-    requesterId: string | undefined,
-    rawCursor: string | undefined,
-    rawLimit: number | undefined
-  ): Promise<PaginatedResult<PostDTO>> {
-    const author = await usersRepository.findByUsername(username);
-    if (!author) throw ApiError.notFound("User not found");
-
-    const includePrivate = requesterId === author.id;
-    const limit = resolvePageSize(rawLimit);
-    const cursor = rawCursor ? decodeCursor(rawCursor) : null;
-
-    const rows = await postsRepository.findUserPostsPage(author.id, includePrivate, limit, cursor);
-    return buildPaginatedResult(rows, limit);
   }
 
   async uploadImage(file: Express.Multer.File): Promise<string> {
@@ -135,6 +75,57 @@ export class PostsService {
     } finally {
       await fs.promises.unlink(file.path).catch(() => {});
     }
+  }
+
+  async getAllPosts(
+    rawCursor: string | undefined,
+    rawLimit: number | undefined,
+    userId?: string
+  ): Promise<PaginatedResult<PostDTO & { isLIkedByUser: boolean }>> {
+    const limit = resolvePageSize(rawLimit);
+    const isFirstPage = !rawCursor && limit === env.DEFAULT_PAGE_SIZE;
+
+    let result: PaginatedResult<PostDTO>;
+
+    if (isFirstPage) {
+      const cacheKey = CacheKeys.publicFeedFirstPage(limit);
+      const cached = await cacheService.get<PaginatedResult<PostDTO>>(cacheKey);
+      if (cached) {
+        result = cached;
+      } else {
+        const rows = await postsRepository.findPublicFeedPage(limit, null);
+        result = buildPaginatedResult(rows, limit);
+        await cacheService.set(cacheKey, result, env.REDIS_CACHE_TTL_FEED_SECONDS);
+      }
+    } else {
+      const cursor = rawCursor ? decodeCursor(rawCursor) : null;
+      const rows = await postsRepository.findPublicFeedPage(limit, cursor);
+      result = buildPaginatedResult(rows, limit);
+    }
+
+    let likedPostIds = new Set<string>();
+    if (userId && result.items.length > 0) {
+      const postIds = result.items.map((p) => p.id);
+      const userLikes = await prisma.like.findMany({
+        where: {
+          userId,
+          targetType: "POST",
+          targetId: { in: postIds },
+        },
+        select: { targetId: true },
+      });
+      likedPostIds = new Set(userLikes.map((l) => l.targetId));
+    }
+
+    const itemsWithLikeStatus = result.items.map((post) => ({
+      ...post,
+      isLIkedByUser: likedPostIds.has(post.id),
+    }));
+
+    return {
+      ...result,
+      items: itemsWithLikeStatus,
+    };
   }
 }
 

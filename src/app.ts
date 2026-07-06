@@ -9,10 +9,8 @@ import { ApiResponse } from "./utils/apiResponse";
 
 import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
-import postsRoutes from "./modules/posts/posts.routes";
-import { postCommentsRouter } from "./modules/comments/comments.routes";
-import likesRoutes from "./modules/likes/likes.routes";
-import feedRoutes from "./modules/feed/feed.routes";
+import postsRoutes, { postRouter } from "./modules/posts/posts.routes";
+import { commentRouter } from "./modules/comments/comments.routes";
 
 export function createApp(): Express {
   const app = express();
@@ -42,9 +40,8 @@ export function createApp(): Express {
   app.use(`${prefix}/auth`, authRoutes);
   app.use(`${prefix}/users`, usersRoutes);
   app.use(`${prefix}/posts`, postsRoutes);
-  app.use(`${prefix}/post`, postCommentsRouter);
-  app.use(`${prefix}/likes`, likesRoutes);
-  app.use(`${prefix}/feed`, feedRoutes);
+  app.use(`${prefix}/post`, postRouter);
+  app.use(`${prefix}/comments`, commentRouter);
 
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);
