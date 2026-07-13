@@ -39,8 +39,9 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   // Fail fast: a misconfigured environment must never boot into a half-working state.
   // eslint-disable-next-line no-console
-  console.error("Invalid environment configuration:", parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  const errors = parsed.error.flatten().fieldErrors;
+  console.error("Invalid environment configuration:", errors);
+  throw new Error("Invalid environment configuration: " + JSON.stringify(errors));
 }
 
 export const env = parsed.data;
