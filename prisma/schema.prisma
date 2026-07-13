@@ -74,6 +74,7 @@ model Post {
   authorId        String   @db.ObjectId
   text            String
   imageUrl        String?
+  imagePublicId   String?
   isPublic        Boolean  @default(true)
 
   likesCount    Int @default(0)

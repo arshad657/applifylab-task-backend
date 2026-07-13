@@ -4,6 +4,7 @@ export const createPostSchema = z.object({
   body: z.object({
     text: z.string().max(2000).optional().default(""),
     imageUrl: z.string().url().optional(),
+    imagePublicId: z.string().optional(),
     isPublic: z.boolean().optional().default(true),
   }),
   params: z.object({}).optional(),

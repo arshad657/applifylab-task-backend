@@ -18,10 +18,10 @@ export class PostsController {
     if (!req.file) {
       throw ApiError.badRequest("No file uploaded");
     }
-    const fileUrl = await postsService.uploadImage(req.file);
+    const result = await postsService.uploadImage(req.file);
     ApiResponse.success(res, {
       message: "File uploaded successfully",
-      data: { url: fileUrl },
+      data: { url: result.url, publicId: result.publicId },
     });
   }
 

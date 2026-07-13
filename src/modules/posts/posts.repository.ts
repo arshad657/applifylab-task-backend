@@ -5,6 +5,7 @@ export interface CreatePostData {
   authorId: string;
   text: string;
   imageUrl?: string;
+  imagePublicId?: string;
   isPublic?: boolean;
 }
 

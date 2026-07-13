@@ -6,8 +6,7 @@ import { cacheService } from "../cache/cache.service";
 import { CacheKeys } from "../cache/cache.keys";
 import { env } from "../../config/env";
 import type { CreatePostInput } from "./posts.validation";
-import { cloudinary } from "../../config/cloudinary";
-import fs from "fs";
+import { uploadBufferToCloudinary } from "../../utils/cloudinary";
 import { prisma } from "../../lib/prisma";
 
 export interface PostDTO {
@@ -15,6 +14,7 @@ export interface PostDTO {
   authorId: string;
   text: string;
   imageUrl: string | null;
+  imagePublicId: string | null;
   isPublic?: boolean;
   likesCount: number;
   commentsCount: number;
@@ -43,6 +43,7 @@ export class PostsService {
       authorId: userId,
       text: input.text,
       imageUrl: input.imageUrl,
+      imagePublicId: input.imagePublicId,
       isPublic: input.isPublic,
     });
 
@@ -54,22 +55,15 @@ export class PostsService {
     return toDTO(post);
   }
 
-  async uploadImage(file: Express.Multer.File): Promise<string> {
-    if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
-      await fs.promises.unlink(file.path).catch(() => {});
-      throw ApiError.internal("Cloudinary is not configured on the server");
+  async uploadImage(file: Express.Multer.File): Promise<{ url: string; publicId: string }> {
+    if (!file.buffer) {
+      throw ApiError.badRequest("File buffer is missing");
     }
-
-    try {
-      const result = await cloudinary.uploader.upload(file.path, {
-        folder: "uploads",
-      });
-      return result.secure_url;
-    } catch (error: any) {
-      throw ApiError.internal(`Failed to upload image to Cloudinary: ${error.message}`);
-    } finally {
-      await fs.promises.unlink(file.path).catch(() => {});
-    }
+    const result = await uploadBufferToCloudinary(file.buffer, "posts");
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+    };
   }
 
   async getAllPosts(
