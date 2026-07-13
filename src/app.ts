@@ -15,6 +15,9 @@ import { commentRouter } from "./modules/comments/comments.routes";
 export function createApp(): Express {
   const app = express();
 
+  // Trust Vercel's proxy headers for rate limiting
+  app.set("trust proxy", 1);
+
   // Security headers.
   app.use(helmet());
 
